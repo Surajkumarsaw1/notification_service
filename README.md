@@ -54,8 +54,8 @@ The service follows a microservices architecture with the following components:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/Surajkumarsaw1/notification-service.git
-cd notification-service
+git clone https://github.com/Surajkumarsaw1/notification_service.git
+cd notification_service
 ```
 
 2. Set up your environment variables:
