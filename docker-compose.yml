@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: notification_service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+      - ./credentials:/app/credentials
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - rabbitmq
+      - redis
+    env_file:
+      - .env
+    networks:
+      - notification_network
+
+  celery_worker:
+    build: .
+    container_name: notification_celery_worker
+    command: celery -A app.core.celery_app worker --loglevel=info
+    volumes:
+      - .:/app
+      - ./credentials:/app/credentials
+    depends_on:
+      - api
+      - rabbitmq
+      - redis
+    env_file:
+      - .env
+    networks:
+      - notification_network
+
+  celery_beat:
+    build: .
+    container_name: notification_celery_beat
+    command: celery -A app.core.celery_app beat --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - api
+      - rabbitmq
+      - redis
+    env_file:
+      - .env
+    networks:
+      - notification_network
+
+  flower:
+    build: .
+    container_name: notification_flower
+    command: celery -A app.core.celery_app flower --port=5555
+    volumes:
+      - .:/app
+    ports:
+      - "5555:5555"
+    depends_on:
+      - api
+      - rabbitmq
+      - redis
+      - celery_worker
+    env_file:
+      - .env
+    networks:
+      - notification_network
+
+  db:
+    image: postgres:14
+    container_name: notification_service_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    networks:
+      - notification_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: notification_service_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    networks:
+      - notification_network
+
+  redis:
+    image: redis:6
+    container_name: notification_service_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - notification_network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:
+
+networks:
+  notification_network:
+    driver: bridge
